@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Online Bookstore</title>
+<style>
+body { font-family: Arial; margin: 20px }
+section { border: 1px solid #aaa; padding: 10px; margin-bottom: 15px }
+h2 { margin-top: 0 }
+input, select, button { margin: 3px }
+table { border-collapse: collapse; width: 100% }
+td, th { border: 1px solid #666; padding: 5px; text-align: left }
+.hidden { display: none }
+</style>
+</head>
+<body>
+
+<h1>📚 Online Bookstore</h1>
+
+<!-- ================= AUTH ================= -->
+<section id="auth">
+<h2>Login</h2>
+<input id="luser" placeholder="Username">
+<input id="lpass" type="password" placeholder="Password">
+<button onclick="login()">Login</button>
+
+<h3>Register (Customer)</h3>
+<input id="ruser" placeholder="Username">
+<input id="rpass" type="password" placeholder="Password">
+<input id="rfname" placeholder="First Name">
+<input id="rlname" placeholder="Last Name">
+<input id="remail" placeholder="Email">
+<input id="rphone" placeholder="Phone">
+<input id="raddr" placeholder="Address">
+<button onclick="register()">Register</button>
+</section>
+
+<button id="logoutBtn" class="hidden" onclick="logout()">Logout</button>
+
+<!-- ================= SEARCH ================= -->
+<section id="search" class="hidden">
+<h2>Search Books</h2>
+<input id="q" placeholder="Title or ISBN">
+<input id="author" placeholder="Author">
+<input id="publisher" placeholder="Publisher">
+<select id="category">
+<option value="">Any Category</option>
+<option>Science</option>
+<option>Art</option>
+<option>Religion</option>
+<option>History</option>
+<option>Geography</option>
+</select>
+<button onclick="search()">Search</button>
+
+<table id="results">
+<tr>
+<th>Title</th>
+<th>Authors</th>
+<th>Category</th>
+<th>Publisher</th>
+<th>Year</th>
+<th>Price</th>
+<th>Stock</th>
+<th></th>
+</tr>
+</table>
+</section>
+
+<!-- ================= CART ================= -->
+<section id="cartSec" class="hidden">
+<h2>Shopping Cart</h2>
+<table id="cartTbl"></table>
+<h3>Total: $<span id="total">0</span></h3>
+<input id="card" placeholder="Credit Card (16 digits)">
+<input id="exp" placeholder="Expiry MM/YY">
+<button onclick="checkout()">Checkout</button>
+</section>
+
+<!-- ================= PROFILE ================= -->
+<section id="profile" class="hidden">
+<h2>Edit Profile</h2>
+<input id="pfname" placeholder="First Name">
+<input id="plname" placeholder="Last Name">
+<input id="pemail" placeholder="Email">
+<input id="pphone" placeholder="Phone">
+<input id="paddr" placeholder="Address">
+<input id="ppass" type="password" placeholder="New Password">
+<button onclick="updateProfile()">Save</button>
+</section>
+
+<!-- ================= ORDERS ================= -->
+<section id="orders" class="hidden">
+<h2>My Orders</h2>
+<table id="ordersTbl"></table>
+<button onclick="loadOrders()">Refresh Orders</button>
+</section>
+
+<!-- ================= ADMIN ================= -->
+<section id="admin" class="hidden">
+<h2>Admin Panel</h2>
+
+<h3>Add Book</h3>
+<input id="aisbn" placeholder="ISBN">
+<input id="atitle" placeholder="Title">
+<input id="aprice" placeholder="Price">
+<input id="astock" placeholder="Stock">
+<input id="ath" placeholder="Threshold">
+<input id="apublisher" placeholder="Publisher ID">
+<input
+  type="number"
+  id="ayear"
+  placeholder="Publication Year"
+  min="1000"
+  max="2025"
+  step="1"
+>
+<select id="acategory">
+  <option value="">Select Category</option>
+  <option>Science</option>
+  <option>Art</option>
+  <option>Religion</option>
+  <option>History</option>
+  <option>Geography</option>
+</select>
+<button onclick="addBook()">Add Book</button>
+
+<h3>Update Book</h3>
+<input id="uisbn" placeholder="ISBN">
+<input id="uprice" placeholder="Price">
+<input id="ustock" placeholder="Stock">
+<input id="uth" placeholder="Threshold">
+<button onclick="updateBook()">Update Book</button>
+
+<h3>Confirm Publisher Order</h3>
+<input id="orderId" placeholder="Order ID">
+<button onclick="confirmOrder()">Confirm</button>
+
+<h3>Reports</h3>
+<button onclick="salesLastMonth()">Sales Last Month</button>
+<input id="rdate" type="date">
+<button onclick="salesByDate()">Sales By Date</button>
+<button onclick="topCustomers()">Top Customers</button>
+<button onclick="topBooks()">Top Books</button>
+<input id="risbn" placeholder="ISBN">
+<button onclick="reorders()">Reorder Count</button>
+
+<pre id="report"></pre>
+</section>
+
+<script>
+let userId = null;
+let role = "";
+let cart = [];
+function isValidEmail(email) {
+  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return regex.test(email);
+}
+
+function resetSearchResults() {
+    const results = document.getElementById("results");
+    results.innerHTML = `
+    <tr>
+      <th>Title</th>
+      <th>Authors</th>
+      <th>Category</th>
+      <th>Publisher</th>
+      <th>Year</th>
+      <th>Price</th>
+      <th>Stock</th>
+      <th></th>
+    </tr>`;
+}
+
+/* ========== AUTH ========== */
+
+function login() {
+    // Get values properly
+    const username = document.getElementById('luser').value;
+    const password = document.getElementById('lpass').value;
+    
+    console.log("Attempting login with:", username); // For debugging
+    
+    fetch("backend/login.php", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            username: username,
+            password: password
+        })
+    })
+    .then(async res => {
+        const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error(data.message || "Login failed");
+        }
+
+        return data;
+    })
+
+    .then(d => {
+        console.log("Login response:", d); // Debug
+        
+        if (!d.user_id) {
+            alert("Invalid login credentials");
+            return;
+        }
+
+        userId = d.user_id;
+        role = d.role;
+
+         // Clear login inputs
+        document.getElementById("luser").value = "";
+        document.getElementById("lpass").value = "";
+
+        // Hide/show sections
+        document.getElementById('auth').classList.add("hidden");
+        document.getElementById('logoutBtn').classList.remove("hidden");
+        document.getElementById('search').classList.remove("hidden");
+        document.getElementById('profile').classList.remove("hidden");
+        document.getElementById('orders').classList.remove("hidden");
+
+        if (role === "ADMIN") {
+            document.getElementById('admin').classList.remove("hidden");
+        }
+
+        alert("Welcome " + d.username);
+    })
+    .catch(err => {
+        console.error("Login error:", err);
+        alert("Login error: " + err.message);
+    });
+}
+
+
+
+function register(){
+    if (!remail.value.trim()) {
+    alert("Email is required");
+    remail.focus();
+    return;
+  }
+
+  if (!isValidEmail(remail.value)) {
+    alert("Please enter a valid email address");
+    remail.focus();
+    return;
+  }
+  fetch("backend/register.php", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      username: ruser.value,
+      password: rpass.value,
+      first_name: rfname.value,
+      last_name: rlname.value,
+      email: remail.value,
+      phone: rphone.value,
+      address: raddr.value
+    })
+  })
+  .then(async res => {
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || data.message);
+    return data;
+  })
+  .then(d => {
+    alert(d.message);
+
+    // Clear registration fields
+    document.getElementById("ruser").value = "";
+    document.getElementById("rpass").value = "";
+    document.getElementById("rfname").value = "";
+    document.getElementById("rlname").value = "";
+    document.getElementById("remail").value = "";
+    document.getElementById("rphone").value = "";
+    document.getElementById("raddr").value = "";
+})
+  .catch(err => alert("ERROR: " + err.message));
+}
+
+
+/* ========== SEARCH & CART ========== */
+function search(){
+fetch(`backend/search_books.php?q=${q.value}&cat=${category.value}&auth=${author.value}&pub=${publisher.value}`)
+.then(r=>r.json())
+.then(d=>{
+results.innerHTML = `
+<tr>
+  <th>Title</th>
+  <th>Authors</th>
+  <th>Category</th>
+  <th>Publisher</th>
+  <th>Year</th>
+  <th>Price</th>
+  <th>Stock</th>
+  <th></th>
+</tr>`;
+
+d.forEach(b=>{
+results.innerHTML+=`
+<tr>
+<td>${b.title}</td>
+<td>${b.authors}</td>
+<td>${b.category}</td>
+<td>${b.publisher}</td>
+<td>${b.publication_year}</td>
+<td>${b.price}</td>
+<td>${b.stock}</td>
+<td><button onclick='addToCart(${JSON.stringify(b)})'>Add</button></td>
+</tr>`;
+});
+});
+}
+
+
+function addToCart(b){
+    const existing = cart.find(item => item.isbn === b.isbn);
+
+    if (existing) {
+        existing.qty += 1;
+    } else {
+        cart.push({...b, qty:1});
+    }
+
+    renderCart();
+    if (existing && existing.qty >= b.stock) {
+    alert("No more stock available for this book");
+    return;
+}
+
+}
+
+
+function renderCart(){
+let totalPrice=0;
+cartTbl.innerHTML="<tr><th>Book</th><th>Qty</th><th></th></tr>";
+cart.forEach((c,i)=>{
+totalPrice += c.price*c.qty;
+cartTbl.innerHTML+=`
+<tr>
+<td>${c.title}</td>
+<td>${c.qty}</td>
+<td><button onclick="removeFromCart(${i})">X</button></td>
+</tr>`;
+});
+total.innerText = totalPrice;
+cartSec.classList.remove("hidden");
+}
+
+function removeFromCart(i){
+cart.splice(i,1);
+renderCart();
+}
+
+function checkout(){
+    fetch("backend/checkout.php",{
+        method:"POST",
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+            user_id:userId,
+            cart:cart,
+            card:card.value,
+            exp:exp.value
+        })
+    })
+    .then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.message);
+        return data;
+    })
+    .then(d => {
+        alert(d.message);
+        cart = [];
+        renderCart();
+        search(); // refresh stock display
+    })
+    .catch(err => {
+        alert("Checkout failed: " + err.message);
+    });
+}
+
+
+/* ========== PROFILE ========== */
+function updateProfile() {
+    let data = { user_id: userId };
+
+    if (pfname.value.trim()) data.first_name = pfname.value;
+    if (plname.value.trim()) data.last_name = plname.value;
+    if (pemail.value.trim()) data.email = pemail.value;
+    if (pphone.value.trim()) data.phone = pphone.value;
+    if (paddr.value.trim()) data.address = paddr.value;
+    if (ppass.value.trim()) data.password = ppass.value;
+
+    if (Object.keys(data).length === 1) {
+        alert("Please change at least one field");
+        return;
+    }
+
+    if (pemail.value.trim() !== "") {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if (!emailRegex.test(pemail.value)) {
+            alert("Please enter a valid email address");
+            pemail.focus();
+            return;
+        }
+    }
+
+    fetch("backend/update_profile.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+    })
+    .then(async r => {
+        const res = await r.json();
+        if (!r.ok) throw new Error(res.message);
+        return res;
+    })
+    .then(d => {
+        alert(d.message);
+        pfname.value = "";
+        plname.value = "";
+        pemail.value = "";
+        pphone.value = "";
+        paddr.value = "";
+        ppass.value = "";
+    })
+    .catch(err => alert("Update failed: " + err.message));
+}
+
+
+/* ========== ORDERS ========== */
+function loadOrders() {
+    let url = "backend/my_orders.php";
+    
+    // If admin, use admin orders endpoint
+    if (role === "ADMIN") {
+        url = "backend/admin_orders.php";
+    } else {
+        url += "?user_id=" + userId;
+    }
+    
+    fetch(url)
+    .then(r => r.json())
+    .then(d => {
+        ordersTbl.innerHTML = "<tr><th>ID</th><th>Date</th><th>Books</th><th>Total</th>" + 
+                              (role === "ADMIN" ? "<th>Customer</th>" : "") + "</tr>";
+        
+        d.forEach(o => {
+            let row = `
+            <tr>
+                <td>${o.order_id}</td>
+                <td>${o.order_date}</td>
+                <td>${o.books || 'No books'}</td>
+                <td>$${parseFloat(o.total_price || 0).toFixed(2)}</td>`;
+            
+            if (role === "ADMIN") {
+                row += `<td>${o.customer || 'Unknown'}</td>`;
+            }
+            
+            row += `</tr>`;
+            ordersTbl.innerHTML += row;
+        });
+    })
+    .catch(err => {
+        console.error("Error loading orders:", err);
+        ordersTbl.innerHTML += `<tr><td colspan="4">Error loading orders</td></tr>`;
+    });
+}
+/* ========== ADMIN ========== */
+function addBook() {
+
+    const isbn = aisbn.value.trim();
+    const title = atitle.value.trim();
+    const publisher_id = apublisher.value.trim();
+    const year = ayear.value.trim();
+    const category = acategory.value;
+    const price = aprice.value.trim();
+    const stock = astock.value.trim();
+    const threshold = ath.value.trim();
+
+    // Required fields
+    if (!isbn || !title || !publisher_id || !year || !category || !price || !stock || !threshold) {
+        alert("All fields are required");
+        return;
+    }
+
+    // Publisher ID
+    if (!Number.isInteger(Number(publisher_id)) || publisher_id <= 0) {
+        alert("Publisher ID must be a positive integer");
+        return;
+    }
+
+    // Publication year
+    const currentYear = new Date().getFullYear();
+    if (!Number.isInteger(Number(year)) || year < 1000 || year > currentYear) {
+        alert("Enter a valid publication year");
+        return;
+    }
+
+    // Price
+    if (isNaN(price) || Number(price) <= 0) {
+        alert("Price must be a positive number");
+        return;
+    }
+
+    // Stock
+    if (!Number.isInteger(Number(stock)) || stock < 0) {
+        alert("Stock must be a non-negative integer");
+        return;
+    }
+
+    // Threshold
+    if (!Number.isInteger(Number(threshold)) || threshold < 0) {
+        alert("Threshold must be a non-negative integer");
+        return;
+    }
+
+    fetch("backend/add_book.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            isbn,
+            title,
+            publisher_id,
+            publication_year: year,
+            category,
+            price,
+            stock,
+            threshold
+        })
+    })
+    .then(async res => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+        return data;
+    })
+    .then(d => {
+        alert(d.message);
+
+        // Clear fields
+        aisbn.value = "";
+        atitle.value = "";
+        apublisher.value = "";
+        ayear.value = "";
+        acategory.value = "";
+        aprice.value = "";
+        astock.value = "";
+        ath.value = "";
+    })
+    .catch(err => alert("Error: " + err.message));
+}
+
+
+
+
+function updateBook() {
+
+    const isbn = uisbn.value.trim();
+    const price = uprice.value.trim();
+    const stock = ustock.value.trim();
+    const threshold = uth.value.trim();
+
+    // ISBN required
+    if (!isbn) {
+        alert("ISBN is required");
+        return;
+    }
+
+    // At least one field required
+    if (!price && !stock && !threshold) {
+        alert("Enter at least one field to update");
+        return;
+    }
+
+    // Numeric validation
+    if (price && isNaN(price)) {
+        alert("Price must be a number");
+        return;
+    }
+
+    if (stock && (!Number.isInteger(Number(stock)) || stock < 0)) {
+        alert("Stock must be a non-negative integer");
+        return;
+    }
+
+    if (threshold && (!Number.isInteger(Number(threshold)) || threshold < 0)) {
+        alert("Threshold must be a non-negative integer");
+        return;
+    }
+
+    fetch("backend/update_book.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            isbn,
+            price,
+            stock,
+            threshold
+        })
+    })
+    .then(async res => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+        return data;
+    })
+    .then(d => {
+        alert(d.message);
+
+        // Clear fields after success
+        uisbn.value = "";
+        uprice.value = "";
+        ustock.value = "";
+        uth.value = "";
+    })
+    .catch(err => alert("Error: " + err.message));
+}
+
+
+
+function confirmOrder() {
+    const id = orderId.value.trim();
+
+    if (!id) {
+        alert("Order ID is required");
+        return;
+    }
+
+    fetch("backend/confirm_order.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: id })
+    })
+    .then(async res => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+        return data;
+    })
+    .then(d => {
+        alert(d.message);
+        orderId.value = ""; //clear box after success
+    })
+    .catch(err => alert("Error: " + err.message));
+}
+
+
+/* ========== REPORTS ========== */
+function salesLastMonth(){
+fetch("backend/report_sales_last_month.php")
+.then(r=>r.json()).then(d=>report.innerText=JSON.stringify(d,null,2));
+}
+function salesByDate(){
+fetch("backend/report_sales_by_date.php?date="+rdate.value)
+.then(r=>r.json()).then(d=>report.innerText=JSON.stringify(d,null,2));
+}
+function topCustomers(){
+fetch("backend/report_top_customers.php")
+.then(r=>r.json()).then(d=>report.innerText=JSON.stringify(d,null,2));
+}
+function topBooks(){
+fetch("backend/report_top_books.php")
+.then(r=>r.json()).then(d=>report.innerText=JSON.stringify(d,null,2));
+}
+function reorders(){
+fetch("backend/report_reorders.php?isbn="+risbn.value)
+.then(r=>r.json()).then(d=>report.innerText=JSON.stringify(d,null,2));
+}
+
+function logout() {
+    // Clear frontend state
+    userId = null;
+    role = "";
+    cart = [];
+
+
+    // CLEAR ORDERS TABLE
+    document.getElementById("ordersTbl").innerHTML = "";
+
+    // Clear cart UI
+    document.getElementById("cartTbl").innerHTML = "";
+    document.getElementById("total").innerText = "0";
+    
+    //  CLEAR SEARCH RESULTS AND INPUTS 
+    resetSearchResults();
+    document.getElementById("q").value = "";
+    document.getElementById("author").value = "";
+    document.getElementById("publisher").value = "";
+    document.getElementById("category").value = "";
+
+    // Hide all logged-in sections
+    document.getElementById("search").classList.add("hidden");
+    document.getElementById("cartSec").classList.add("hidden");
+    document.getElementById("profile").classList.add("hidden");
+    document.getElementById("orders").classList.add("hidden");
+    document.getElementById("admin").classList.add("hidden");
+
+    // Show auth again
+    document.getElementById("auth").classList.remove("hidden");
+    document.getElementById("logoutBtn").classList.add("hidden");
+
+    alert("Logged out successfully");
+}
+</script>
+</body>
+</html>
