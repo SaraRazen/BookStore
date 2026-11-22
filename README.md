@@ -154,6 +154,4 @@ This project is intended for learning and coursework, and is **not production-re
 - **Card data:** card numbers are only format-checked and are never charged or stored. Use a real payment provider for anything beyond a demo.
 - **Debug output:** `display_errors` is enabled in some files, and `db.php` uses root with no password. Disable both outside local development.
 
-## License
 
-Add a license of your choice (e.g. MIT) to this repository.
